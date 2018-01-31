@@ -21,6 +21,10 @@ type Conn struct {
 	cluster C.rados_t
 }
 
+func (c *Conn) GetCluster() C.rados_t {
+	return c.cluster
+}
+
 // PingMonitor sends a ping to a monitor and returns the reply.
 func (c *Conn) PingMonitor(id string) (string, error) {
 	c_id := C.CString(id)

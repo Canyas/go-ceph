@@ -10,6 +10,10 @@ import "C"
 import "fmt"
 import "unsafe"
 
+import (
+	rados "github.com/Canyas/go-ceph/rados"
+)
+
 //
 type CephError int
 
@@ -25,6 +29,16 @@ type MountInfo struct {
 func CreateMount() (*MountInfo, error) {
 	mount := &MountInfo{}
 	ret := C.ceph_create(&mount.mount, nil)
+	if ret == 0 {
+		return mount, nil
+	} else {
+		return nil, CephError(ret)
+	}
+}
+
+func CreateMountFromRados(c rados.Conn) (*MountInfo, error) {
+	mount := &MountInfo{}
+	ret := C.ceph_create_from_rados(&mount.mount, c.GetCluster())
 	if ret == 0 {
 		return mount, nil
 	} else {
