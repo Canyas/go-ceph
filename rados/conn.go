@@ -8,8 +8,8 @@ import "C"
 import "unsafe"
 import "bytes"
 
-// ClusterStat represents Ceph cluster statistics.
-type ClusterStat struct {
+// clusterStat represents Ceph cluster statistics.
+type clusterStat struct {
 	Kb          uint64
 	Kb_used     uint64
 	Kb_avail    uint64
@@ -18,11 +18,7 @@ type ClusterStat struct {
 
 // Conn is a connection handle to a Ceph cluster.
 type Conn struct {
-	cluster C.rados_t
-}
-
-func (c *Conn) GetCluster() C.rados_t {
-	return c.cluster
+	Cluster C.rados_t
 }
 
 // PingMonitor sends a ping to a monitor and returns the reply.
@@ -33,7 +29,7 @@ func (c *Conn) PingMonitor(id string) (string, error) {
 	var strlen C.size_t
 	var strout *C.char
 
-	ret := C.rados_ping_monitor(c.cluster, c_id, &strout, &strlen)
+	ret := C.rados_ping_monitor(c.Cluster, c_id, &strout, &strlen)
 	defer C.rados_buffer_free(strout)
 
 	if ret == 0 {
@@ -47,7 +43,7 @@ func (c *Conn) PingMonitor(id string) (string, error) {
 // Connect establishes a connection to a RADOS cluster. It returns an error,
 // if any.
 func (c *Conn) Connect() error {
-	ret := C.rados_connect(c.cluster)
+	ret := C.rados_connect(c.Cluster)
 	if ret == 0 {
 		return nil
 	} else {
@@ -57,14 +53,14 @@ func (c *Conn) Connect() error {
 
 // Shutdown disconnects from the cluster.
 func (c *Conn) Shutdown() {
-	C.rados_shutdown(c.cluster)
+	C.rados_shutdown(c.Cluster)
 }
 
 // ReadConfigFile configures the connection using a Ceph configuration file.
 func (c *Conn) ReadConfigFile(path string) error {
 	c_path := C.CString(path)
 	defer C.free(unsafe.Pointer(c_path))
-	ret := C.rados_conf_read_file(c.cluster, c_path)
+	ret := C.rados_conf_read_file(c.Cluster, c_path)
 	if ret == 0 {
 		return nil
 	} else {
@@ -75,7 +71,7 @@ func (c *Conn) ReadConfigFile(path string) error {
 // ReadDefaultConfigFile configures the connection using a Ceph configuration
 // file located at default locations.
 func (c *Conn) ReadDefaultConfigFile() error {
-	ret := C.rados_conf_read_file(c.cluster, nil)
+	ret := C.rados_conf_read_file(c.Cluster, nil)
 	if ret == 0 {
 		return nil
 	} else {
@@ -87,7 +83,7 @@ func (c *Conn) OpenIOContext(pool string) (*IOContext, error) {
 	c_pool := C.CString(pool)
 	defer C.free(unsafe.Pointer(c_pool))
 	ioctx := &IOContext{}
-	ret := C.rados_ioctx_create(c.cluster, c_pool, &ioctx.ioctx)
+	ret := C.rados_ioctx_create(c.Cluster, c_pool, &ioctx.ioctx)
 	if ret == 0 {
 		return ioctx, nil
 	} else {
@@ -99,7 +95,7 @@ func (c *Conn) OpenIOContext(pool string) (*IOContext, error) {
 func (c *Conn) ListPools() (names []string, err error) {
 	buf := make([]byte, 4096)
 	for {
-		ret := int(C.rados_pool_list(c.cluster,
+		ret := int(C.rados_pool_list(c.Cluster,
 			(*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf))))
 		if ret < 0 {
 			return nil, RadosError(int(ret))
@@ -128,7 +124,7 @@ func (c *Conn) SetConfigOption(option, value string) error {
 	c_opt, c_val := C.CString(option), C.CString(value)
 	defer C.free(unsafe.Pointer(c_opt))
 	defer C.free(unsafe.Pointer(c_val))
-	ret := C.rados_conf_set(c.cluster, c_opt, c_val)
+	ret := C.rados_conf_set(c.Cluster, c_opt, c_val)
 	if ret < 0 {
 		return RadosError(int(ret))
 	} else {
@@ -142,7 +138,7 @@ func (c *Conn) GetConfigOption(name string) (value string, err error) {
 	buf := make([]byte, 4096)
 	c_name := C.CString(name)
 	defer C.free(unsafe.Pointer(c_name))
-	ret := int(C.rados_conf_get(c.cluster, c_name,
+	ret := int(C.rados_conf_get(c.Cluster, c_name,
 		(*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf))))
 	// FIXME: ret may be -ENAMETOOLONG if the buffer is not large enough. We
 	// can handle this case, but we need a reliable way to test for
@@ -158,7 +154,7 @@ func (c *Conn) GetConfigOption(name string) (value string, err error) {
 // WaitForLatestOSDMap blocks the caller until the latest OSD map has been
 // retrieved.
 func (c *Conn) WaitForLatestOSDMap() error {
-	ret := C.rados_wait_for_latest_osdmap(c.cluster)
+	ret := C.rados_wait_for_latest_osdmap(c.Cluster)
 	if ret < 0 {
 		return RadosError(int(ret))
 	} else {
@@ -166,15 +162,15 @@ func (c *Conn) WaitForLatestOSDMap() error {
 	}
 }
 
-// GetClusterStat returns statistics about the cluster associated with the
+// GetclusterStat returns statistics about the cluster associated with the
 // connection.
-func (c *Conn) GetClusterStats() (stat ClusterStat, err error) {
+func (c *Conn) GetclusterStats() (stat clusterStat, err error) {
 	c_stat := C.struct_rados_cluster_stat_t{}
-	ret := C.rados_cluster_stat(c.cluster, &c_stat)
+	ret := C.rados_cluster_stat(c.Cluster, &c_stat)
 	if ret < 0 {
-		return ClusterStat{}, RadosError(int(ret))
+		return clusterStat{}, RadosError(int(ret))
 	} else {
-		return ClusterStat{
+		return clusterStat{
 			Kb:          uint64(c_stat.kb),
 			Kb_used:     uint64(c_stat.kb_used),
 			Kb_avail:    uint64(c_stat.kb_avail),
@@ -199,7 +195,7 @@ func (c *Conn) ParseCmdLineArgs(args []string) error {
 		defer C.free(unsafe.Pointer(argv[i+1]))
 	}
 
-	ret := C.rados_conf_parse_argv(c.cluster, argc, &argv[0])
+	ret := C.rados_conf_parse_argv(c.Cluster, argc, &argv[0])
 	if ret < 0 {
 		return RadosError(int(ret))
 	} else {
@@ -210,7 +206,7 @@ func (c *Conn) ParseCmdLineArgs(args []string) error {
 // ParseDefaultConfigEnv configures the connection from the default Ceph
 // environment variable(s).
 func (c *Conn) ParseDefaultConfigEnv() error {
-	ret := C.rados_conf_parse_env(c.cluster, nil)
+	ret := C.rados_conf_parse_env(c.Cluster, nil)
 	if ret == 0 {
 		return nil
 	} else {
@@ -222,7 +218,7 @@ func (c *Conn) ParseDefaultConfigEnv() error {
 // is a unique identifier of an entire Ceph cluster.
 func (c *Conn) GetFSID() (fsid string, err error) {
 	buf := make([]byte, 37)
-	ret := int(C.rados_cluster_fsid(c.cluster,
+	ret := int(C.rados_cluster_fsid(c.Cluster,
 		(*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf))))
 	// FIXME: the success case isn't documented correctly in librados.h
 	if ret == 36 {
@@ -237,14 +233,14 @@ func (c *Conn) GetFSID() (fsid string, err error) {
 // connection instance.
 func (c *Conn) GetInstanceID() uint64 {
 	// FIXME: are there any error cases for this?
-	return uint64(C.rados_get_instance_id(c.cluster))
+	return uint64(C.rados_get_instance_id(c.Cluster))
 }
 
 // MakePool creates a new pool with default settings.
 func (c *Conn) MakePool(name string) error {
 	c_name := C.CString(name)
 	defer C.free(unsafe.Pointer(c_name))
-	ret := int(C.rados_pool_create(c.cluster, c_name))
+	ret := int(C.rados_pool_create(c.Cluster, c_name))
 	if ret == 0 {
 		return nil
 	} else {
@@ -256,7 +252,7 @@ func (c *Conn) MakePool(name string) error {
 func (c *Conn) DeletePool(name string) error {
 	c_name := C.CString(name)
 	defer C.free(unsafe.Pointer(c_name))
-	ret := int(C.rados_pool_delete(c.cluster, c_name))
+	ret := int(C.rados_pool_delete(c.Cluster, c_name))
 	if ret == 0 {
 		return nil
 	} else {
@@ -286,7 +282,7 @@ func (c *Conn) monCommand(args, inputBuffer []byte) (buffer []byte, info string,
 	inbufLen := len(inputBuffer)
 	defer C.free(unsafe.Pointer(inbuf))
 
-	ret := C.rados_mon_command(c.cluster,
+	ret := C.rados_mon_command(c.Cluster,
 		&argv, 1,
 		inbuf,              // bulk input (e.g. crush map)
 		C.size_t(inbufLen), // length inbuf

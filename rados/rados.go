@@ -39,7 +39,7 @@ func Version() (int, int, int) {
 // error, if any.
 func NewConn() (*Conn, error) {
 	conn := &Conn{}
-	ret := C.rados_create(&conn.cluster, nil)
+	ret := C.rados_create(&conn.Cluster, nil)
 
 	if ret == 0 {
 		return conn, nil
@@ -55,7 +55,7 @@ func NewConnWithUser(user string) (*Conn, error) {
 	defer C.free(unsafe.Pointer(c_user))
 
 	conn := &Conn{}
-	ret := C.rados_create(&conn.cluster, c_user)
+	ret := C.rados_create(&conn.Cluster, c_user)
 
 	if ret == 0 {
 		return conn, nil
@@ -74,7 +74,7 @@ func NewConnWithClusterAndUser(clusterName string, userName string) (*Conn, erro
 	defer C.free(unsafe.Pointer(c_name))
 
 	conn := &Conn{}
-	ret := C.rados_create2(&conn.cluster, c_cluster_name, c_name, 0)
+	ret := C.rados_create2(&conn.Cluster, c_cluster_name, c_name, 0)
 	if ret == 0 {
 		return conn, nil
 	} else {

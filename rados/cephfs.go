@@ -1,18 +1,16 @@
-package cephfs
+package rados
 
 /*
 #cgo LDFLAGS: -lcephfs
 #cgo CPPFLAGS: -D_FILE_OFFSET_BITS=64
 #include <stdlib.h>
 #include <cephfs/libcephfs.h>
+#include <rados/librados.h>
 */
 import "C"
 import "fmt"
 import "unsafe"
 
-import (
-	rados "github.com/Canyas/go-ceph/rados"
-)
 
 //
 type CephError int
@@ -36,9 +34,9 @@ func CreateMount() (*MountInfo, error) {
 	}
 }
 
-func CreateMountFromRados(c rados.Conn) (*MountInfo, error) {
+func CreateMountFromRados(c Conn) (*MountInfo, error) {
 	mount := &MountInfo{}
-	ret := C.ceph_create_from_rados(&mount.mount, c.GetCluster())
+	ret := C.ceph_create_from_rados(&mount.mount, c.Cluster)
 	if ret == 0 {
 		return mount, nil
 	} else {
