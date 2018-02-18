@@ -1,4 +1,4 @@
-package rados
+package cephfs
 
 import "testing"
 import "github.com/ceph/go-ceph/cephfs"
