@@ -6,10 +6,13 @@ package cephfs
 #include <stdlib.h>
 #include <cephfs/libcephfs.h>
 #include <dirent.h>
+#include <sys/statvfs.h>
 */
 import "C"
 import "fmt"
-import "unsafe"
+import (
+	"unsafe"
+)
 
 
 //
@@ -34,6 +37,32 @@ type DirResult struct {
 
 type CephStatx struct {
 	cephStatx *C.struct_ceph_statx
+}
+
+type CephStat struct {
+	Kb					uint64
+}
+
+type FsStatx struct {
+	fsStatx *C.struct_statvfs
+}
+
+type FsStat struct {
+	FsID 				uint64
+	MaxFileNameLength 	uint64
+	Flags 				uint64
+
+	BlockSizeKB			uint64
+	FragmentSizeKB 		uint64
+
+	KB					uint64
+	KB_used 			uint64
+	KB_avail 			uint64
+}
+
+type ExtAttribute struct {
+	Key string
+	Value interface{}
 }
 
 func CreateMount() (*MountInfo, error) {
@@ -129,3 +158,108 @@ func (mount *MountInfo) ListDir() ([]string, error) {
 	return dir, nil
 }
 
+func (mount *MountInfo) GetFsStats() (*FsStat, error) {
+	var statx *FsStatx = &FsStatx{&C.struct_statvfs{}}
+
+	c_path := C.CString("/")
+	defer C.free(unsafe.Pointer(c_path))
+
+	ret := C.ceph_statfs(mount.mount, c_path, statx.fsStatx)
+	if(ret < 0) {
+		return nil, CephError(ret)
+	}
+
+	var stat *FsStat = &FsStat{}
+	stat.FsID = uint64(statx.fsStatx.f_fsid)
+	stat.BlockSizeKB = uint64(statx.fsStatx.f_bsize) /8 /1024
+	stat.FragmentSizeKB = uint64(statx.fsStatx.f_frsize) /8 /1024
+	stat.Flags = uint64(statx.fsStatx.f_flag)
+	stat.MaxFileNameLength = uint64(statx.fsStatx.f_namemax)
+
+	stat.KB = uint64(statx.fsStatx.f_blocks) * stat.FragmentSizeKB
+	stat.KB_avail = uint64(statx.fsStatx.f_bfree) * stat.BlockSizeKB
+	stat.KB_used = stat.KB - stat.KB_avail
+
+	return stat, nil
+}
+
+func (mount *MountInfo) GetExtendedAttributes(path string) ([]ExtAttribute, error) {
+	c_path := C.CString(path)
+	defer C.free(unsafe.Pointer(c_path))
+
+	var bufSize uint64
+	bufSize = 256
+
+	buf := [256]C.char{}
+
+	ret := C.ceph_listxattr(mount.mount, c_path, &buf[0], *((*C.size_t)(&bufSize)))
+	if (ret < 0) {
+		return []ExtAttribute{}, CephError(ret)
+	}
+
+	key := C.GoString(&buf[0])
+
+	fmt.Println(key)
+
+	buf = [256]C.char{}
+
+	c_key := C.CString(key)
+	defer C.free(unsafe.Pointer(c_key))
+
+	ret = C.ceph_getxattr(mount.mount, c_path, c_key, unsafe.Pointer(&buf) , *((*C.size_t)(&bufSize)))
+	if(ret < 0) {
+		return []ExtAttribute{}, CephError(ret)
+	}
+
+	val := C.GoString(&buf[0])
+
+	attr := []ExtAttribute{ ExtAttribute{key, val} }
+
+	return attr, nil
+}
+
+func (mount *MountInfo) SetExtendedAttributes(path string, name string, value string) error {
+	c_path := C.CString(path)
+	defer C.free(unsafe.Pointer(c_path))
+
+	c_name := C.CString(name)
+	defer C.free(unsafe.Pointer(c_name))
+
+	c_value := C.CString(value)
+	defer C.free(unsafe.Pointer(c_value))
+
+	// Check if this attribute already exists
+	var size uint64
+
+	buf := [256]C.char{}
+
+	ret := C.ceph_getxattr(mount.mount, c_path, c_name, unsafe.Pointer(&buf), *((*C.size_t)(&size)))
+	if(ret < 0) {
+		return CephError(ret)
+	}
+
+	// Set the new value
+	// CEPH_XATTR_CREATE: 1
+	// CEPH_XATTR_REPLACE: 2
+	flags := 1
+
+	if(size > 0) {
+		flags = 2
+	}
+
+	size = uint64(len(value))
+
+	fmt.Print("Size: ")
+	fmt.Println(size)
+	fmt.Print("Flags: ")
+	fmt.Println(flags)
+
+	c_flags := C.int(flags)
+
+	ret = C.ceph_setxattr(mount.mount, c_path, c_name, unsafe.Pointer(c_value), *((*C.size_t)(&size)), c_flags)
+	if(ret < 0) {
+		return CephError(ret)
+	}
+
+	return nil
+}
