@@ -65,6 +65,10 @@ type ExtAttribute struct {
 	Value interface{}
 }
 
+type Inodex struct {
+	inode *C.struct_Inode
+}
+
 func CreateMount() (*MountInfo, error) {
 	mount := &MountInfo{}
 	ret := C.ceph_create(&mount.mount, nil)
@@ -158,6 +162,21 @@ func (mount *MountInfo) ListDir() ([]string, error) {
 	return dir, nil
 }
 
+func (mount *MountInfo) Rename(path string, name string) (error) {
+	c_path := C.CString(path)
+	defer C.free(unsafe.Pointer(c_path))
+
+	c_name := C.CString(name)
+	defer C.free(unsafe.Pointer(c_name))
+
+	ret := C.ceph_rename(mount.mount, c_path, c_name)
+	if(ret < 0) {
+		return CephError(ret)
+	}
+
+	return nil
+}
+
 func (mount *MountInfo) GetFsStats() (*FsStat, error) {
 	var statx *FsStatx = &FsStatx{&C.struct_statvfs{}}
 
@@ -188,7 +207,7 @@ func (mount *MountInfo) GetExtendedAttributes(path string) ([]ExtAttribute, erro
 	defer C.free(unsafe.Pointer(c_path))
 
 	var bufSize uint64
-	bufSize = 256
+	bufSize = 180
 
 	buf := [256]C.char{}
 
@@ -218,6 +237,28 @@ func (mount *MountInfo) GetExtendedAttributes(path string) ([]ExtAttribute, erro
 	return attr, nil
 }
 
+func (mount *MountInfo) GetExtendedAttribute(path string, name string) (ExtAttribute, error) {
+	c_path := C.CString(path)
+	defer C.free(unsafe.Pointer(c_path))
+
+	c_name := C.CString(name)
+	defer C.free(unsafe.Pointer(c_name))
+
+	// Check if this attribute already exists
+	var size uint64
+
+	size = 256
+
+	buf := [256]C.char{}
+
+	ret := C.ceph_getxattr(mount.mount, c_path, c_name, unsafe.Pointer(&buf), *((*C.size_t)(&size)))
+	if(ret < 0) {
+		return ExtAttribute{}, CephError(ret)
+	}
+
+	return ExtAttribute{name, C.GoString(&buf[0])}, nil
+}
+
 func (mount *MountInfo) SetExtendedAttributes(path string, name string, value string) error {
 	c_path := C.CString(path)
 	defer C.free(unsafe.Pointer(c_path))
@@ -231,20 +272,20 @@ func (mount *MountInfo) SetExtendedAttributes(path string, name string, value st
 	// Check if this attribute already exists
 	var size uint64
 
-	buf := [256]C.char{}
+	size = 256
 
-	ret := C.ceph_getxattr(mount.mount, c_path, c_name, unsafe.Pointer(&buf), *((*C.size_t)(&size)))
-	if(ret < 0) {
-		return CephError(ret)
-	}
+	buf := [256]C.char{}
 
 	// Set the new value
 	// CEPH_XATTR_CREATE: 1
 	// CEPH_XATTR_REPLACE: 2
-	flags := 1
+	flags := 2
 
-	if(size > 0) {
-		flags = 2
+	ret := C.ceph_getxattr(mount.mount, c_path, c_name, unsafe.Pointer(&buf), *((*C.size_t)(&size)))
+	if(ret == -61) {
+		flags = 1
+	} else if (ret < 0) {
+		return CephError(ret)
 	}
 
 	size = uint64(len(value))
