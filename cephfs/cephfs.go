@@ -135,6 +135,16 @@ func (mount *MountInfo) MakeDir(path string, mode uint32) error {
 	}
 }
 
+func (mount *MountInfo) RemoveDir(path string) error {
+	c_path := C.CString(path)
+	defer C.free(unsafe.Pointer(c_path))
+
+	ret := C.ceph_rmdir(mount.mount, c_path)
+	if(ret < 0) {
+		return CephError(ret)
+	}
+}
+
 func (mount *MountInfo) ListDir() ([]string, error) {
 	var dirp *DirResult = &DirResult{}
 	var dire *DirEntry = &DirEntry{}
