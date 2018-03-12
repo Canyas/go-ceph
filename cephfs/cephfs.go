@@ -62,7 +62,7 @@ type FsStat struct {
 
 type ExtAttribute struct {
 	Key string
-	Value interface{}
+	Value string
 }
 
 type Inodex struct {
@@ -77,6 +77,14 @@ func CreateMount() (*MountInfo, error) {
 	} else {
 		return nil, CephError(ret)
 	}
+}
+
+func (mount *MountInfo) DestroyMount() error {
+	ret := C.ceph_release(mount.mount)
+	if(ret < 0) {
+		return CephError(ret)
+	}
+	return nil
 }
 
 func (mount *MountInfo) ReadDefaultConfigFile() error {
@@ -95,6 +103,14 @@ func (mount *MountInfo) Mount() error {
 	} else {
 		return CephError(ret)
 	}
+}
+
+func (mount *MountInfo) Unmount() error {
+	ret := C.ceph_unmount(mount.mount)
+	if(ret < 0) {
+		return CephError(ret)
+	}
+	return nil
 }
 
 func (mount *MountInfo) SyncFs() error {
@@ -143,6 +159,8 @@ func (mount *MountInfo) RemoveDir(path string) error {
 	if(ret < 0) {
 		return CephError(ret)
 	}
+
+	return nil
 }
 
 func (mount *MountInfo) ListDir() ([]string, error) {
