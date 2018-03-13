@@ -116,6 +116,35 @@ func (mount *MountInfo) IsMounted() bool {
 	return true
 }
 
+func (mount *MountInfo) SetConfig(option string, value string) error {
+	c_option := C.CString(option)
+	defer C.free(unsafe.Pointer(c_option))
+
+	c_value := C.CString(value)
+	defer C.free(unsafe.Pointer(c_value))
+
+	ret := C.ceph_conf_set(mount.mount, c_option, c_value)
+	if(ret < 0) {
+		return CephError(ret)
+	}
+
+	return nil
+}
+func (mount *MountInfo) GetConfig(option string) (string, error) {
+	c_option := C.CString(option)
+	defer C.free(unsafe.Pointer(c_option))
+
+	var bufSize uint64 = 256
+	buf := [256]C.char{}
+
+	ret :=  C.ceph_conf_get(mount.mount, c_option, &buf[0], *((*C.size_t)(&bufSize)))
+	if(ret < 0) {
+		return "", CephError(ret)
+	}
+
+	return C.GoString(&buf[0]), nil
+}
+
 func (mount *MountInfo) SyncFs() error {
 	ret := C.ceph_sync_fs(mount.mount)
 	if ret == 0 {
@@ -234,7 +263,7 @@ func (mount *MountInfo) GetExtendedAttributes(path string) ([]ExtAttribute, erro
 	defer C.free(unsafe.Pointer(c_path))
 
 	var bufSize uint64
-	bufSize = 180
+	bufSize = 256
 
 	buf := [256]C.char{}
 
