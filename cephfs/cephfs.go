@@ -78,7 +78,6 @@ func CreateMount() (*MountInfo, error) {
 		return nil, CephError(ret)
 	}
 }
-
 func (mount *MountInfo) DestroyMount() error {
 	ret := C.ceph_release(mount.mount)
 	if(ret < 0) {
@@ -86,7 +85,6 @@ func (mount *MountInfo) DestroyMount() error {
 	}
 	return nil
 }
-
 func (mount *MountInfo) ReadDefaultConfigFile() error {
 	ret := C.ceph_conf_read_file(mount.mount, nil)
 	if ret == 0 {
@@ -95,7 +93,6 @@ func (mount *MountInfo) ReadDefaultConfigFile() error {
 		return CephError(ret)
 	}
 }
-
 func (mount *MountInfo) Mount() error {
 	ret := C.ceph_mount(mount.mount, nil)
 	if ret == 0 {
@@ -104,13 +101,19 @@ func (mount *MountInfo) Mount() error {
 		return CephError(ret)
 	}
 }
-
 func (mount *MountInfo) Unmount() error {
 	ret := C.ceph_unmount(mount.mount)
 	if(ret < 0) {
 		return CephError(ret)
 	}
 	return nil
+}
+func (mount *MountInfo) IsMounted() bool {
+	ret := C.ceph_is_mounted(mount.mount)
+	if(ret < 0) {
+		return false
+	}
+	return true
 }
 
 func (mount *MountInfo) SyncFs() error {
@@ -126,7 +129,6 @@ func (mount *MountInfo) CurrentDir() string {
 	c_dir := C.ceph_getcwd(mount.mount)
 	return C.GoString(c_dir)
 }
-
 func (mount *MountInfo) ChangeDir(path string) error {
 	c_path := C.CString(path)
 	defer C.free(unsafe.Pointer(c_path))
@@ -138,7 +140,6 @@ func (mount *MountInfo) ChangeDir(path string) error {
 		return CephError(ret)
 	}
 }
-
 func (mount *MountInfo) MakeDir(path string, mode uint32) error {
 	c_path := C.CString(path)
 	defer C.free(unsafe.Pointer(c_path))
@@ -150,7 +151,6 @@ func (mount *MountInfo) MakeDir(path string, mode uint32) error {
 		return CephError(ret)
 	}
 }
-
 func (mount *MountInfo) RemoveDir(path string) error {
 	c_path := C.CString(path)
 	defer C.free(unsafe.Pointer(c_path))
@@ -162,7 +162,6 @@ func (mount *MountInfo) RemoveDir(path string) error {
 
 	return nil
 }
-
 func (mount *MountInfo) ListDir() ([]string, error) {
 	var dirp *DirResult = &DirResult{}
 	var dire *DirEntry = &DirEntry{}
@@ -264,7 +263,6 @@ func (mount *MountInfo) GetExtendedAttributes(path string) ([]ExtAttribute, erro
 
 	return attr, nil
 }
-
 func (mount *MountInfo) GetExtendedAttribute(path string, name string) (ExtAttribute, error) {
 	c_path := C.CString(path)
 	defer C.free(unsafe.Pointer(c_path))
@@ -286,7 +284,6 @@ func (mount *MountInfo) GetExtendedAttribute(path string, name string) (ExtAttri
 
 	return ExtAttribute{name, C.GoString(&buf[0])}, nil
 }
-
 func (mount *MountInfo) SetExtendedAttributes(path string, name string, value string) error {
 	c_path := C.CString(path)
 	defer C.free(unsafe.Pointer(c_path))
